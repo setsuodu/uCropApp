@@ -47,9 +47,32 @@ public class MainActivity extends Activity {
         public boolean onLongClick(View v) {
             if (v.getId()==R.id.button){
                 Toast.makeText(MainActivity.this, "您长按了控件："+((TextView)v).getText(), Toast.LENGTH_SHORT).show();
+                chooseVideo();
             }
             return false;
         }
+    }
+
+    /**
+     * 从相册中选择视频
+     */
+    private void choiceVideo() {
+        Intent i = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI);
+        startActivityForResult(i, 66);
+    }
+    private void chooseVideo() {
+        Intent intent = new Intent();
+        /* 开启Pictures画面Type设定为image */
+        //intent.setType("image/*");
+        // intent.setType("audio/*"); //选择音频
+        intent.setType("video/*"); //选择视频 （mp4 3gp 是android支持的视频格式）
+
+        // intent.setType("video/*;image/*");//同时选择视频和图片
+
+        /* 使用Intent.ACTION_GET_CONTENT这个Action */
+        intent.setAction(Intent.ACTION_GET_CONTENT);
+        /* 取得相片后返回本画面 */
+        startActivityForResult(intent, 1);
     }
 
     public void onPick() {
@@ -61,13 +84,19 @@ public class MainActivity extends Activity {
             beginCrop(result.getData());
         } else if (requestCode == Crop.REQUEST_CROP) {
             handleCrop(resultCode, result);
+        } else if (requestCode == 1) {
+            System.out.println("选择了视频 resultCode=" + resultCode + ", data=" + result.getData());
+            //content://com.android.providers.media.documents/document/video%3A224528
         }
     }
     private void beginCrop(Uri source) {
-        Uri destination = Uri.fromFile(new File(getCacheDir(), "cropped"));
+        int max=100,min=1;
+        int ran2 = (int) (Math.random()*(max-min)+min);
+        Uri destination = Uri.fromFile(new File(getCacheDir(), "cropped" + ran2)); //同一个uri写保护，无法覆盖
         Crop.of(source, destination).asSquare().start(this);
     }
     private void handleCrop(int resultCode, Intent result) {
+        System.out.println("handleCrop: resultCode=" + resultCode);
         if (resultCode == RESULT_OK) {
             resultView.setImageURI(Crop.getOutput(result));
         } else if (resultCode == Crop.RESULT_ERROR) {
