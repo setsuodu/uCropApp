@@ -1,7 +1,10 @@
 package com.test.cropapp;
 
 import android.Manifest;
+import android.annotation.TargetApi;
 import android.app.Activity;
+import android.content.ContentResolver;
+import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -9,6 +12,7 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
@@ -22,6 +26,7 @@ import androidx.annotation.NonNull;
 import androidx.core.content.FileProvider;
 
 import com.soundcloud.android.crop.Crop;
+import com.test.cropapp.*;
 
 import java.io.File;
 
@@ -71,28 +76,45 @@ public class MainActivity extends Activity {
     protected void onActivityResult(int requestCode, int resultCode, Intent result) {
 //        super.onActivityResult(requestCode, resultCode, result);
 
+        //uri  = "content://media/external/images/media/210302"
         //path = "/storage/emulated/0/DCIM/Camera/IMG_20200331_191413.jpg"
-        //Uri  = "content://com.android.providers.media.documents/document/video%3A224528"
+        //uri  = "content://com.android.providers.media.documents/document/video%3A224527"
+        //uri  = "content://com.android.providers.media.documents/document/video%3A224528"
 
         if (resultCode == RESULT_OK) {
             switch (requestCode) {
                 case REQUEST_GALLERY: {
-                    Log.e(TAG, "onActivityResult: REQUEST_GALLERY: uri=" + result.getData()); //返回的是Uri
-                    //onActivityResult: REQUEST_GALLERY: uri=content://media/external/images/media/221904
-                    String path = getRealPathFromUri(this, result.getData());
+//                    Log.e(TAG, "onActivityResult: REQUEST_GALLERY: uri=" + result.getData()); //返回的是Uri
+
+                    String path = toPath(result);
                     resultText.setText("uri=" + result.getData() + "\n\npath=" + path);
+                    Log.e(TAG, "onActivityResult: REQUEST_CROP: path=" + path);
                     break;
                 } //相册
                 case REQUEST_Camera: {
-                    Log.e(TAG, "onActivityResult: REQUEST_Camera: uri=" + result.getData());
+//                    Log.e(TAG, "onActivityResult: REQUEST_Camera: uri=" + result.getData());
+
+                    String path = toPath(result);
+                    resultText.setText("uri=" + result.getData() + "\n\npath=" + path);
+                    Log.e(TAG, "onActivityResult: REQUEST_CROP: path=" + path);
                     break;
                 } //拍照
                 case REQUEST_CROP: {
-                    Log.e(TAG, "onActivityResult: REQUEST_CROP: uri=" + result.getData());
-                    String path = getRealPathFromUri(this, result.getData());
+//                    Log.e(TAG, "onActivityResult: REQUEST_CROP: uri=" + result.getData());
+
+                    String path = toPath(result);
+                    resultText.setText("uri=" + result.getData() + "\n\npath=" + path);
                     Log.e(TAG, "onActivityResult: REQUEST_CROP: path=" + path);
                     break;
                 } //裁剪
+                case REQUEST_VIDEO: {
+//                    Log.e(TAG, "onActivityResult: REQUEST_VIDEO: uri=" + result.getData());
+
+                    String path = toPath(result);
+                    resultText.setText("uri=" + result.getData() + "\n\npath=" + path);
+                    Log.e(TAG, "onActivityResult: REQUEST_CROP: path=" + path);
+                    break;
+                } //选择视频
                 case Crop.REQUEST_PICK: {
                     beginCrop(result.getData());
                     break;
@@ -166,7 +188,7 @@ public class MainActivity extends Activity {
     private void openVideo() {
         //Intent.ACTION_GET_CONTENT获取的是所有本地图片
         //Intent.ACTION_PICK获取的是相册中的图片
-        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+        Intent intent = new Intent(Intent.ACTION_PICK);
 //        Intent intent = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI);
 
         //intent.setType("image/*"); //选择图片
@@ -216,18 +238,76 @@ public class MainActivity extends Activity {
         return uri;
     }
     // Uri转Path
-    public static String getRealPathFromUri(Context context, Uri contentUri) {
-        Cursor cursor = null;
-        try {
-            String[] proj = { MediaStore.Images.Media.DATA };
-            cursor = context.getContentResolver().query(contentUri, proj, null, null, null);
-            int column_index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
-            cursor.moveToFirst();
-            return cursor.getString(column_index);
-        } finally {
-            if (cursor != null) {
+    public static String getRealFilePath( final Context context, final Uri uri ) {
+        if ( null == uri ) return null;
+        final String scheme = uri.getScheme();
+        String data = null;
+        if ( scheme == null )
+            data = uri.getPath();
+        else if ( ContentResolver.SCHEME_FILE.equals( scheme ) ) {
+            data = uri.getPath();
+        } else if ( ContentResolver.SCHEME_CONTENT.equals( scheme ) ) {
+            Cursor cursor = context.getContentResolver().query( uri, new String[] { MediaStore.Images.ImageColumns.DATA }, null, null, null );
+            if ( null != cursor ) {
+                if ( cursor.moveToFirst() ) {
+                    int index = cursor.getColumnIndex( MediaStore.Images.ImageColumns.DATA );
+                    if ( index > -1 ) {
+                        data = cursor.getString( index );
+                    }
+                }
                 cursor.close();
             }
         }
+        return data;
+    }
+
+    private String toPath(Intent data) {
+//        Log.e(TAG, "onActivityResult: SDK=" + Build.VERSION.SDK_INT); //SDK=29
+        String path = "";
+        if (Build.VERSION.SDK_INT >= 19) {
+            path = handlePathOnKitKat(data);
+        } else {
+            path = handlePathBeforeKitKat(data);
+        }
+        return path;
+    }
+    private String handlePathBeforeKitKat(Intent data) {
+        Uri uri = data.getData();
+        String path = uri.getPath();
+        //somethings
+        return path;
+    }
+    @TargetApi(19)
+    private String handlePathOnKitKat(Intent data) {
+        String path = null;
+        Uri uri = data.getData();
+        if (DocumentsContract.isDocumentUri(this, uri)) {
+            String docId = DocumentsContract.getDocumentId(uri);
+            if ("com.android.providers.media.documents".equals(uri.getAuthority())) {
+                String id = docId.split(":")[1];
+                String selection = MediaStore.Images.Media._ID + "=" + id;
+                path = getPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, selection);
+            } else if ("com.android.providers.downloads.documents".equals(uri.getAuthority())) {
+                Uri contentUri = ContentUris.withAppendedId(Uri.parse("content://downloads/public_downloads"), Long.valueOf(docId));
+                path = getPath(contentUri, null);
+            }
+        } else if ("content".equalsIgnoreCase(uri.getScheme())) {
+            path = getPath(uri, null);
+        } else if ("file".equalsIgnoreCase(uri.getScheme())) {
+            path = uri.getPath();
+        }
+        //somethins
+        return path;
+    }
+    private String getPath(Uri uri, String selection) {
+        String path = null;
+        Cursor cursor = getContentResolver().query(uri, null, selection, null, null);
+        if (cursor != null) {
+            if (cursor.moveToFirst()) {
+                path = cursor.getString(cursor.getColumnIndex(MediaStore.Images.Media.DATA));
+            }
+            cursor.close();
+        }
+        return path;
     }
 }
