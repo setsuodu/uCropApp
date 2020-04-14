@@ -1,10 +1,12 @@
 package com.test.cropapp;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.ContentResolver;
 import android.content.ContentUris;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -12,6 +14,7 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import android.util.Log;
@@ -29,6 +32,9 @@ import com.soundcloud.android.crop.Crop;
 import com.test.cropapp.*;
 
 import java.io.File;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 public class MainActivity extends Activity {
     private TextView resultText;
@@ -55,8 +61,13 @@ public class MainActivity extends Activity {
         galleryBtn.setOnClickListener(new GalleryClickListener()); //点击事件
         galleryBtn.setOnLongClickListener(new GalleryLongClickListener()); //长按事件
 
+        Button cameraBtn = (Button) findViewById(R.id.camera);
+        cameraBtn.setOnClickListener(new CameraClickListener());
+
         Button videoBtn = (Button) findViewById(R.id.video);
         videoBtn.setOnClickListener(new VideoClickListener());
+
+        checkPermissions();
     }
 
     @Override
@@ -72,6 +83,7 @@ public class MainActivity extends Activity {
         }
     }
 
+    @SuppressLint("SetTextI18n")
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent result) {
 //        super.onActivityResult(requestCode, resultCode, result);
@@ -88,15 +100,15 @@ public class MainActivity extends Activity {
 
                     String path = toPath(result);
                     resultText.setText("uri=" + result.getData() + "\n\npath=" + path);
-                    Log.e(TAG, "onActivityResult: REQUEST_CROP: path=" + path);
+                    Log.e(TAG, "onActivityResult: REQUEST_GALLERY: path=" + path);
                     break;
                 } //相册
                 case REQUEST_Camera: {
-//                    Log.e(TAG, "onActivityResult: REQUEST_Camera: uri=" + result.getData());
+                    Log.e(TAG, "onActivityResult: REQUEST_Camera: 拍照完成:" + imageUri);
 
-                    String path = toPath(result);
-                    resultText.setText("uri=" + result.getData() + "\n\npath=" + path);
-                    Log.e(TAG, "onActivityResult: REQUEST_CROP: path=" + path);
+                    String path = getRealFilePath(this, imageUri);
+                    resultText.setText("uri=" + imageUri + "\n\npath=" + path);
+                    Log.e(TAG, "onActivityResult: REQUEST_Camera: path=" + path);
                     break;
                 } //拍照
                 case REQUEST_CROP: {
@@ -112,7 +124,7 @@ public class MainActivity extends Activity {
 
                     String path = toPath(result);
                     resultText.setText("uri=" + result.getData() + "\n\npath=" + path);
-                    Log.e(TAG, "onActivityResult: REQUEST_CROP: path=" + path);
+                    Log.e(TAG, "onActivityResult: REQUEST_VIDEO: path=" + path);
                     break;
                 } //选择视频
                 case Crop.REQUEST_PICK: {
@@ -144,6 +156,17 @@ public class MainActivity extends Activity {
                 onPick();
             }
             return false;
+        }
+    }
+
+    private class CameraClickListener implements View.OnClickListener {
+        @Override
+        public void onClick(View v) {
+            if (v.getId()==R.id.camera) {
+                Toast.makeText(MainActivity.this, "您点击了控件："+((TextView)v).getText(), Toast.LENGTH_SHORT).show();
+//                openCamera0();
+                openCamera();
+            }
         }
     }
 
@@ -180,6 +203,37 @@ public class MainActivity extends Activity {
         Intent intent = new Intent(Intent.ACTION_PICK);
         intent.setDataAndType(MediaStore.Images.Media.INTERNAL_CONTENT_URI, "image/*");
         startActivityForResult(intent, REQUEST_GALLERY);
+    }
+
+    /**
+     * 拍照
+     */
+    public void openCamera0() {
+        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE); //用来打开相机的Intent
+        startActivityForResult(intent, REQUEST_Camera);//启动相机
+    }
+    Uri imageUri;
+    public void openCamera() {
+        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        imageUri = getImageUri();
+        intent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
+        startActivityForResult(intent, REQUEST_Camera);
+    }
+    public Uri getImageUri() {
+        File file = new File(Environment.getExternalStorageDirectory(), "/temp/" + System.currentTimeMillis() + ".jpg");
+        if (!file.getParentFile().exists()) {
+            file.getParentFile().mkdirs();
+        }
+        String path = file.getPath();
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            imageUri = Uri.fromFile(file);
+        } else {
+            //兼容android7.0 使用共享文件的形式
+            ContentValues contentValues = new ContentValues(1);
+            contentValues.put(MediaStore.Images.Media.DATA, path);
+            imageUri = this.getApplication().getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues);
+        }
+        return imageUri;
     }
 
     /**
