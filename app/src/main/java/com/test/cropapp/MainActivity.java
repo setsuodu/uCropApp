@@ -1,6 +1,5 @@
 package com.test.cropapp;
 
-import android.Manifest;
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Activity;
@@ -11,6 +10,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.Manifest;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -29,12 +29,8 @@ import androidx.annotation.NonNull;
 import androidx.core.content.FileProvider;
 
 import com.soundcloud.android.crop.Crop;
-import com.test.cropapp.*;
 
 import java.io.File;
-import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 
 public class MainActivity extends Activity {
     private TextView resultText;
@@ -164,7 +160,6 @@ public class MainActivity extends Activity {
         public void onClick(View v) {
             if (v.getId()==R.id.camera) {
                 Toast.makeText(MainActivity.this, "您点击了控件："+((TextView)v).getText(), Toast.LENGTH_SHORT).show();
-//                openCamera0();
                 openCamera();
             }
         }
@@ -187,11 +182,17 @@ public class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             // 检查是否有存储和拍照权限
             if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
-                    && checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                && checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+                && checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
             ) {
                 hasPermission = true;
             } else {
-                requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.CAMERA}, REQUEST_PERMISSION);
+                requestPermissions(new String[] {
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                    Manifest.permission.READ_EXTERNAL_STORAGE,
+                    Manifest.permission.CAMERA
+                },
+                REQUEST_PERMISSION);
             }
         }
     }
@@ -208,11 +209,7 @@ public class MainActivity extends Activity {
     /**
      * 拍照
      */
-    public void openCamera0() {
-        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE); //用来打开相机的Intent
-        startActivityForResult(intent, REQUEST_Camera);//启动相机
-    }
-    Uri imageUri;
+    Uri imageUri = null;
     public void openCamera() {
         Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         imageUri = getImageUri();
@@ -239,7 +236,7 @@ public class MainActivity extends Activity {
     /**
      * 选择视频
      */
-    private void openVideo() {
+    public void openVideo() {
         //Intent.ACTION_GET_CONTENT获取的是所有本地图片
         //Intent.ACTION_PICK获取的是相册中的图片
         Intent intent = new Intent(Intent.ACTION_PICK);
