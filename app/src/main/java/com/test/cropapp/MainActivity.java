@@ -11,6 +11,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.Manifest;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -31,6 +32,7 @@ import androidx.core.content.FileProvider;
 //import com.soundcloud.android.crop.Crop;
 
 import com.yalantis.ucrop.UCrop;
+import com.yalantis.ucrop.UCropActivity;
 
 import java.io.File;
 
@@ -83,21 +85,20 @@ public class MainActivity extends Activity {
 
     @SuppressLint("SetTextI18n")
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent result) {
-//        super.onActivityResult(requestCode, resultCode, result);
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+//        super.onActivityResult(requestCode, resultCode, data);
 
         //uri  = "content://media/external/images/media/210302"
         //path = "/storage/emulated/0/DCIM/Camera/IMG_20200331_191413.jpg"
         //uri  = "content://com.android.providers.media.documents/document/video%3A224527"
-        //uri  = "content://com.android.providers.media.documents/document/video%3A224528"
 
         if (resultCode == RESULT_OK) {
             switch (requestCode) {
                 case REQUEST_GALLERY: {
 //                    Log.e(TAG, "onActivityResult: REQUEST_GALLERY: uri=" + result.getData()); //返回的是Uri
 
-                    String path = toPath(result);
-                    resultText.setText("uri=" + result.getData() + "\n\npath=" + path);
+                    String path = toPath(data);
+                    resultText.setText("uri=" + data.getData() + "\n\npath=" + path);
                     Log.e(TAG, "onActivityResult: REQUEST_GALLERY: path=" + path);
                     break;
                 } //相册
@@ -110,18 +111,14 @@ public class MainActivity extends Activity {
                     break;
                 } //拍照
                 case REQUEST_CROP: {
-//                    Log.e(TAG, "onActivityResult: REQUEST_CROP: uri=" + result.getData());
-
-                    String path = toPath(result);
-                    resultText.setText("uri=" + result.getData() + "\n\npath=" + path);
-                    Log.e(TAG, "onActivityResult: REQUEST_CROP: path=" + path);
+//                    String path = toPath(data);
+//                    resultText.setText("uri=" + data.getData() + "\n\npath=" + path);
+//                    Log.e(TAG, "onActivityResult: REQUEST_CROP: path=" + path);
                     break;
                 } //裁剪
                 case REQUEST_VIDEO: {
-//                    Log.e(TAG, "onActivityResult: REQUEST_VIDEO: uri=" + result.getData());
-
-                    String path = toPath(result);
-                    resultText.setText("uri=" + result.getData() + "\n\npath=" + path);
+                    String path = toPath(data);
+                    resultText.setText("uri=" + data.getData() + "\n\npath=" + path);
                     Log.e(TAG, "onActivityResult: REQUEST_VIDEO: path=" + path);
                     break;
                 } //选择视频
@@ -134,7 +131,7 @@ public class MainActivity extends Activity {
 //                    break;
 //                } //裁剪结果
                 case 1: {
-                    final Uri selectedUri = result.getData();
+                    final Uri selectedUri = data.getData();
                     if (selectedUri != null) {
                         startCrop(selectedUri);
                     } else {
@@ -143,7 +140,7 @@ public class MainActivity extends Activity {
                     break;
                 }
                 case UCrop.REQUEST_CROP: {
-                    handleCropResult(result);
+                    handleCropResult(data);
                     break;
                 }
             }
@@ -315,15 +312,95 @@ public class MainActivity extends Activity {
 
         UCrop uCrop = UCrop.of(uri, Uri.fromFile(new File(getCacheDir(), destinationFileName)));
 
-//        uCrop = basisConfig(uCrop);
-//        uCrop = advancedConfig(uCrop);
+        uCrop = basisConfig(uCrop);
+        uCrop = advancedConfig(uCrop);
 
-//        if (requestMode == REQUEST_SELECT_PICTURE_FOR_FRAGMENT) {       //if build variant = fragment
-//            setupFragment(uCrop);
-//        } else {                                                        // else start uCrop Activity
-//            uCrop.start(MainActivity.this);
-//        }
         uCrop.start(MainActivity.this);
+    }
+
+    /**
+     * In most cases you need only to set crop aspect ration and max size for resulting image.
+     *
+     * @param uCrop - ucrop builder instance
+     * @return - ucrop builder instance
+     */
+    private UCrop basisConfig(@NonNull UCrop uCrop) {
+//        uCrop = uCrop.useSourceImageAspectRatio(); //radio_origin
+//        uCrop = uCrop.withAspectRatio(1, 1); //radio_square
+        // do nothing //radio_dynamic
+
+//        int maxWidth = 512;
+//        int maxHeight = 512;
+//        uCrop = uCrop.withMaxResultSize(maxWidth, maxHeight);
+
+        return uCrop;
+    }
+
+    /**
+     * Sometimes you want to adjust more options, it's done via {@link com.yalantis.ucrop.UCrop.Options} class.
+     *
+     * @param uCrop - ucrop builder instance
+     * @return - ucrop builder instance
+     */
+    private UCrop advancedConfig(@NonNull UCrop uCrop) {
+        UCrop.Options options = new UCrop.Options();
+
+//        options.setCompressionFormat(Bitmap.CompressFormat.PNG);
+        options.setCompressionFormat(Bitmap.CompressFormat.JPEG);
+
+        options.setCompressionQuality(90); //压缩
+
+        options.setHideBottomControls(true);
+        options.setFreeStyleCropEnabled(true);
+
+        /*
+        If you want to configure how gestures work for all UCropActivity tabs
+
+        options.setAllowedGestures(UCropActivity.SCALE, UCropActivity.ROTATE, UCropActivity.ALL);
+        * */
+
+        /*
+        This sets max size for bitmap that will be decoded from source Uri.
+        More size - more memory allocation, default implementation uses screen diagonal.
+
+        options.setMaxBitmapSize(640);
+        * */
+
+
+       /*
+
+        Tune everything (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧
+
+        options.setMaxScaleMultiplier(5);
+        options.setImageToCropBoundsAnimDuration(666);
+        options.setDimmedLayerColor(Color.CYAN);
+        options.setCircleDimmedLayer(true);
+        options.setShowCropFrame(false);
+        options.setCropGridStrokeWidth(20);
+        options.setCropGridColor(Color.GREEN);
+        options.setCropGridColumnCount(2);
+        options.setCropGridRowCount(1);
+        options.setToolbarCropDrawable(R.drawable.your_crop_icon);
+        options.setToolbarCancelDrawable(R.drawable.your_cancel_icon);
+
+        // Color palette
+        options.setToolbarColor(ContextCompat.getColor(this, R.color.your_color_res));
+        options.setStatusBarColor(ContextCompat.getColor(this, R.color.your_color_res));
+        options.setToolbarWidgetColor(ContextCompat.getColor(this, R.color.your_color_res));
+        options.setRootViewBackgroundColor(ContextCompat.getColor(this, R.color.your_color_res));
+        options.setActiveControlsWidgetColor(ContextCompat.getColor(this, R.color.your_color_res));
+
+        // Aspect ratio options
+        options.setAspectRatioOptions(1,
+            new AspectRatio("WOW", 1, 2),
+            new AspectRatio("MUCH", 3, 4),
+            new AspectRatio("RATIO", CropImageView.DEFAULT_ASPECT_RATIO, CropImageView.DEFAULT_ASPECT_RATIO),
+            new AspectRatio("SO", 16, 9),
+            new AspectRatio("ASPECT", 1, 1));
+
+       */
+
+        return uCrop.withOptions(options);
     }
 
     private void handleCropResult(@NonNull Intent result) {
