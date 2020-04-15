@@ -28,7 +28,9 @@ import android.widget.VideoView;
 import androidx.annotation.NonNull;
 import androidx.core.content.FileProvider;
 
-import com.soundcloud.android.crop.Crop;
+//import com.soundcloud.android.crop.Crop;
+
+import com.yalantis.ucrop.UCrop;
 
 import java.io.File;
 
@@ -123,15 +125,32 @@ public class MainActivity extends Activity {
                     Log.e(TAG, "onActivityResult: REQUEST_VIDEO: path=" + path);
                     break;
                 } //选择视频
-                case Crop.REQUEST_PICK: {
-                    beginCrop(result.getData());
+//                case Crop.REQUEST_PICK: {
+//                    beginCrop(result.getData());
+//                    break;
+//                } //发起裁剪
+//                case Crop.REQUEST_CROP: {
+//                    handleCrop(resultCode, result);
+//                    break;
+//                } //裁剪结果
+                case 1: {
+                    final Uri selectedUri = result.getData();
+                    if (selectedUri != null) {
+                        startCrop(selectedUri);
+                    } else {
+                        Toast.makeText(MainActivity.this, "Cannot retrieve selected image", Toast.LENGTH_SHORT).show();
+                    }
                     break;
-                } //发起裁剪
-                case Crop.REQUEST_CROP: {
-                    handleCrop(resultCode, result);
+                }
+                case UCrop.REQUEST_CROP: {
+                    handleCropResult(result);
                     break;
-                } //裁剪结果
+                }
             }
+        }
+        if (resultCode == UCrop.RESULT_ERROR) {
+//            handleCropError(data);
+            Log.e(TAG, "UCrop err: " + resultCode);
         }
     }
 
@@ -149,7 +168,8 @@ public class MainActivity extends Activity {
         public boolean onLongClick(View v) {
             if (v.getId()==R.id.gallery) {
                 Toast.makeText(MainActivity.this, "您长按了控件："+((TextView)v).getText(), Toast.LENGTH_SHORT).show();
-                onPick();
+//                onPick();
+                pickFromGallery();
             }
             return false;
         }
@@ -251,29 +271,81 @@ public class MainActivity extends Activity {
         startActivityForResult(intent, REQUEST_VIDEO);
     }
 
-    /**
-     * 裁剪操作
-     */
-    public void onPick() {
-        Crop.pickImage(this);
+//    /**
+//     * soundcloud裁剪操作
+//     */
+//    public void onPick() {
+//        Crop.pickImage(this);
+//    }
+//    /**
+//     * soundcloud裁剪回调
+//     */
+//    private void beginCrop(Uri source) {
+//        int max=100,min=1;
+//        int rand = (int) (Math.random()*(max-min)+min);
+//        Uri destination = Uri.fromFile(new File(getCacheDir(), "cropped" + rand)); //同一个uri写保护，无法覆盖
+//        Crop.of(source, destination).asSquare().start(this);
+//    }
+//    private void handleCrop(int resultCode, Intent result) {
+//        System.out.println("handleCrop: resultCode=" + resultCode);
+//        if (resultCode == RESULT_OK) {
+//            resultImage.setImageURI(Crop.getOutput(result));
+//        } else if (resultCode == Crop.RESULT_ERROR) {
+//            Toast.makeText(this, Crop.getError(result).getMessage(), Toast.LENGTH_SHORT).show();
+//        }
+//    }
+
+    private void pickFromGallery() {
+        Intent intent = new Intent(Intent.ACTION_GET_CONTENT)
+                .setType("image/*")
+                .addCategory(Intent.CATEGORY_OPENABLE);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            String[] mimeTypes = {"image/jpeg", "image/png"};
+            intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
+        }
+
+        startActivityForResult(Intent.createChooser(intent, "Select Picture"), 1);
     }
-    /**
-     * 裁剪回调
-     */
-    private void beginCrop(Uri source) {
-        int max=100,min=1;
-        int rand = (int) (Math.random()*(max-min)+min);
-        Uri destination = Uri.fromFile(new File(getCacheDir(), "cropped" + rand)); //同一个uri写保护，无法覆盖
-        Crop.of(source, destination).asSquare().start(this);
+
+    private void startCrop(@NonNull Uri uri) {
+        String destinationFileName = "SampleCropImage";
+//        destinationFileName += ".png";
+        destinationFileName += ".jpg";
+
+        UCrop uCrop = UCrop.of(uri, Uri.fromFile(new File(getCacheDir(), destinationFileName)));
+
+//        uCrop = basisConfig(uCrop);
+//        uCrop = advancedConfig(uCrop);
+
+//        if (requestMode == REQUEST_SELECT_PICTURE_FOR_FRAGMENT) {       //if build variant = fragment
+//            setupFragment(uCrop);
+//        } else {                                                        // else start uCrop Activity
+//            uCrop.start(MainActivity.this);
+//        }
+        uCrop.start(MainActivity.this);
     }
-    private void handleCrop(int resultCode, Intent result) {
-        System.out.println("handleCrop: resultCode=" + resultCode);
-        if (resultCode == RESULT_OK) {
-            resultImage.setImageURI(Crop.getOutput(result));
-        } else if (resultCode == Crop.RESULT_ERROR) {
-            Toast.makeText(this, Crop.getError(result).getMessage(), Toast.LENGTH_SHORT).show();
+
+    private void handleCropResult(@NonNull Intent result) {
+        final Uri resultUri = UCrop.getOutput(result);
+        if (resultUri != null) {
+            ResultActivity.startWithUri(MainActivity.this, resultUri);
+        } else {
+            Toast.makeText(MainActivity.this, R.string.toast_cannot_retrieve_cropped_image, Toast.LENGTH_SHORT).show();
         }
     }
+
+    @SuppressWarnings("ThrowableResultOfMethodCallIgnored")
+    private void handleCropError(@NonNull Intent result) {
+        final Throwable cropError = UCrop.getError(result);
+        if (cropError != null) {
+            Log.e(TAG, "handleCropError: ", cropError);
+            Toast.makeText(MainActivity.this, cropError.getMessage(), Toast.LENGTH_LONG).show();
+        } else {
+            Toast.makeText(MainActivity.this, R.string.toast_unexpected_error, Toast.LENGTH_SHORT).show();
+        }
+    }
+
 
     // Path转Uri
     private static Uri getUriForFile(Context context, File file) {
